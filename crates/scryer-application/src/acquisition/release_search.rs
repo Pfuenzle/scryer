@@ -823,6 +823,18 @@ pub(crate) fn evidence_key_for_normalized(
                     .is_some_and(|year| key.strip_suffix(&format!(" {year}")) == Some(normalized))
         })
         .cloned()
+        .or_else(|| {
+            let loose_normalized =
+                scryer_domain::title_spelling::title_identity_loose_form(normalized);
+            evidence
+                .lookup_keys
+                .iter()
+                .find(|key| {
+                    scryer_domain::title_spelling::title_identity_loose_form(key)
+                        == loose_normalized
+                })
+                .cloned()
+        })
 }
 
 /// Stacked-alias anchor: fansub names often glue two alias forms of the same
@@ -3519,6 +3531,23 @@ mod tests {
             );
             assert!(match_parsed_release_to_title_evidence(&parsed, &evidence).is_some());
         }
+    }
+
+    #[tokio::test]
+    async fn localized_leading_article_alias_matches_the_release_title() {
+        let mut title = spelling_title("Pokémon Concierge", "eng");
+        title.facet = MediaFacet::Anime;
+        title.year = None;
+        title.imdb_id = None;
+        title.aliases = vec!["Die Pokémon-Concierge".to_string()];
+        title.tagged_aliases.clear();
+        let evidence = spelling_evidence(&title, std::slice::from_ref(&title)).await;
+        let candidate = make_candidate(
+            "Die.Pokemon-Concierge.S01E02.GERMAN.DL.ANiME.1080p.WEB.h264-SAUERKRAUT",
+            None,
+        );
+
+        assert!(candidate_title_match(&candidate, &evidence).is_some());
     }
 
     /// Search results named in romaji reach the same canonical relaxed matcher
